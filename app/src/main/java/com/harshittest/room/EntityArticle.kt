@@ -9,13 +9,13 @@ import com.google.gson.annotations.SerializedName
 @Entity(tableName = "articles")
 data class EntityArticle(
     @PrimaryKey(autoGenerate = true) val id: Int = 0,
-    @SerializedName("title") val title: String?,
-    @SerializedName("description") val description: String?,
-    @SerializedName("author") val author: String?,
-    @SerializedName("url") val url: String?,
-    @SerializedName("urlToImage") val urlToImage: String?,
-    @SerializedName("publishedAt") val publishedAt: String?,
-    @SerializedName("content") val content: String?,
+    @SerializedName("author") val author: String? = null,
+    @SerializedName("title") val title: String? = null,
+    @SerializedName("description") val description: String? = null,
+    @SerializedName("url") val url: String? = null,
+    @SerializedName("urlToImage") val urlToImage: String? = null,
+    @SerializedName("publishedAt") val publishedAt: String? = null,
+    @SerializedName("content") val content: String? = null
 ) : Parcelable {
     constructor(parcel: Parcel) : this(
         parcel.readInt(),
@@ -30,9 +30,9 @@ data class EntityArticle(
 
     override fun writeToParcel(parcel: Parcel, flags: Int) {
         parcel.writeInt(id)
+        parcel.writeString(author)
         parcel.writeString(title)
         parcel.writeString(description)
-        parcel.writeString(author)
         parcel.writeString(url)
         parcel.writeString(urlToImage)
         parcel.writeString(publishedAt)

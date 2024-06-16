@@ -29,68 +29,90 @@ class NewsListRepository(
 
     fun getNewsListFromRepo(
         disposable: CompositeDisposable = CompositeDisposable(),
-        onSuccess: (history: String) -> Unit
+        onSuccess: (history: String) -> Unit,
+        onError: (e: Throwable) -> Unit
     ) {
         // First, fetch data from Room database
         CoroutineScope(Dispatchers.IO).launch {
             val cachedArticles = articleDao.getAllArticles()
+            Log.d("NewsListRepository", "Fetched articles from DB: ${cachedArticles.size}")
             if (cachedArticles.isNotEmpty()) {
                 val cachedJson = Gson().toJson(cachedArticles)
                 withContext(Dispatchers.Main) {
                     onSuccess(cachedJson)
                 }
+            } else {
+                // If no articles in cache, fetch from network
+                fetchArticlesFromNetwork(disposable, onSuccess, onError)
             }
         }
+    }
 
-        // Then fetch the latest articles from the network
+    private fun fetchArticlesFromNetwork(
+        disposable: CompositeDisposable,
+        onSuccess: (history: String) -> Unit,
+        onError: (e: Throwable) -> Unit
+    ) {
         if (AppUtility.isInternetConnected(context)) {
+            Log.d("NewsListRepository", "Showing progress dialog")
             AppUtility.progressBarShow(context)
+
             disposable.add(
                 serviceApi.getWithJsonObject(
                     "top-headlines?country=us&category=business&apiKey=2369f4864dc1475b9fc474ef2e24e3fd"
                 ).subscribeOn(Schedulers.io())
                     .observeOn(AndroidSchedulers.mainThread())
+                    .doOnSubscribe { Log.d("NewsListRepository", "Network request initiated") }
                     .subscribeWith(object : DisposableSingleObserver<Response<JsonObject>>() {
                         override fun onSuccess(response: Response<JsonObject>) {
                             if (response.body() != null) {
                                 val jsonResponse = response.body().toString()
+                                Log.d("NewsListRepository", "Network response body: $jsonResponse")
+
+                                onSuccess(jsonResponse)
                                 // Use a CoroutineScope to handle database operations
                                 CoroutineScope(Dispatchers.IO).launch {
                                     try {
                                         val convertedObject: JsonObject = Gson().fromJson(jsonResponse, JsonObject::class.java)
-                                        val articlesJson = convertedObject.get("articles")
-                                        val articles: List<EntityArticle> = when {
-                                            articlesJson.isJsonArray -> {
-                                                val listType = object : TypeToken<List<EntityArticle>>() {}.type
-                                                Gson().fromJson(articlesJson, listType)
-                                            }
-                                            articlesJson.isJsonObject -> {
-                                                val singleArticle: EntityArticle = Gson().fromJson(articlesJson, EntityArticle::class.java)
-                                                listOf(singleArticle)
-                                            }
-                                            else -> emptyList()
+                                        val articlesJsonArray = convertedObject.getAsJsonArray("articles")
+                                        val articles: List<EntityArticle> = articlesJsonArray.map { jsonElement ->
+                                            val jsonObj = jsonElement.asJsonObject
+                                            EntityArticle(
+                                                author = jsonObj.get("author")?.takeIf { !it.isJsonNull }?.asString,
+                                                title = jsonObj.get("title")?.takeIf { !it.isJsonNull }?.asString,
+                                                description = jsonObj.get("description")?.takeIf { !it.isJsonNull }?.asString,
+                                                url = jsonObj.get("url")?.takeIf { !it.isJsonNull }?.asString,
+                                                urlToImage = jsonObj.get("urlToImage")?.takeIf { !it.isJsonNull }?.asString,
+                                                publishedAt = jsonObj.get("publishedAt")?.takeIf { !it.isJsonNull }?.asString,
+                                                content = jsonObj.get("content")?.takeIf { !it.isJsonNull }?.asString
+                                            )
                                         }
+
+                                        Log.d("NewsListRepository", "Parsed articles from network: ${articles.size}")
 
                                         // Save articles to Room database
                                         articleDao.deleteAllArticles()
                                         articleDao.insertArticles(articles)
                                     } catch (e: Exception) {
+                                        Log.e("NewsListRepository", "Error saving articles to DB", e)
                                         e.printStackTrace()
                                     }
                                 }
-                                onSuccess(jsonResponse)
+
                                 AppUtility.progressBarDissMiss()
                             } else {
-                                handleError(response)
+                                Log.d("NewsListRepository", "Response body is null")
+                                handleError(response, onError)
                             }
                         }
 
                         override fun onError(e: Throwable) {
-                            handleError(null)
+                            Log.e("NewsListRepository", "Network request failed", e)
+                            handleError(null, onError)
                         }
 
-                        private fun handleError(response: Response<JsonObject>?) {
-                            onSuccess("false")
+                        private fun handleError(response: Response<JsonObject>?, onError: (e: Throwable) -> Unit) {
+                            onError(Throwable("Error fetching data from network"))
                             AppUtility.progressBarDissMiss()
                             if (response?.code() != 401) {
                                 Toast.makeText(
@@ -103,8 +125,8 @@ class NewsListRepository(
                     })
             )
         } else {
-            onSuccess("false")
-            // If no network connection, show a message
+            Log.d("NewsListRepository", "No internet connection or invalid context type")
+            onError(Throwable("No internet connection"))
             CoroutineScope(Dispatchers.Main).launch {
                 Toast.makeText(
                     context,

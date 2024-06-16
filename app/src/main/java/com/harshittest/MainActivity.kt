@@ -1,11 +1,13 @@
 package com.harshittest
 
+import android.annotation.SuppressLint
 import android.content.Intent
 import android.os.Bundle
 import android.text.Editable
 import android.text.TextWatcher
 import android.util.Log
 import android.view.View
+import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
 import androidx.databinding.DataBindingUtil
 import androidx.lifecycle.Observer
@@ -30,6 +32,9 @@ class MainActivity : AppCompatActivity() {
         binding = DataBindingUtil.setContentView(this, R.layout.activity_main)
 
         viewModel = ViewModelProvider(this, ViewModelProvider.AndroidViewModelFactory.getInstance(application)).get(NewsViewModel::class.java)
+
+        // Set the context for the ViewModel
+        viewModel.setRepository(this@MainActivity)
 
         setupRecyclerView()
         //for Api call with list refresh
@@ -62,10 +67,17 @@ class MainActivity : AppCompatActivity() {
                 setRecord(articles.toMutableList())
                 binding.txtEmpty.visibility = View.GONE
             } else {
+                setRecord(mutableListOf())  // Handle the case where articles list is empty
                 binding.txtEmpty.visibility = View.VISIBLE
             }
             AppUtility.progressBarDissMiss()
             binding.swipeRefresh.isRefreshing = false
+        })
+
+        viewModel.errorState.observe(this, Observer { isError ->
+            if (isError) {
+                Toast.makeText(this, "Something went wrong, please try again.", Toast.LENGTH_SHORT).show()
+            }
         })
     }
 
@@ -80,8 +92,10 @@ class MainActivity : AppCompatActivity() {
         myMandateAdapter.setData(newsList)
     }
 
+
+    @SuppressLint("SuspiciousIndentation")
     private fun onItemClick(article: EntityArticle) {
-        val intent = Intent(this@MainActivity, NewsDetailsAct::class.java)
+      val intent = Intent(this@MainActivity, NewsDetailsAct::class.java)
         intent.putExtra("article_data", article)
         startActivity(intent)
     }
