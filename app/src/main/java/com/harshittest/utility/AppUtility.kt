@@ -1,10 +1,11 @@
 package com.harshittest.utility
 
+import android.app.Activity
 import android.app.ProgressDialog
 import android.content.Context
 import android.net.ConnectivityManager
 import android.view.WindowManager
-
+import com.harshittest.R
 
 
 class AppUtility {
@@ -13,7 +14,7 @@ class AppUtility {
         var progressDialog: ProgressDialog? = null
 
         fun progressBarShow(context: Context?) {
-           // progressDialog = ProgressDialog(context as Activity, R.style.progressbarstyle)
+            progressDialog = ProgressDialog(context as Activity, R.style.progressbarstyle)
             progressDialog?.setMessage(
                 "Loading" + "..."
             )

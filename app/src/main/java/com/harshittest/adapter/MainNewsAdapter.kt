@@ -1,7 +1,6 @@
 package com.harshittest.adapter
 
 import android.content.Context
-import android.content.Intent
 import android.view.LayoutInflater
 import android.view.ViewGroup
 import android.widget.Filter
@@ -9,10 +8,9 @@ import android.widget.Filterable
 import androidx.core.content.ContextCompat
 import androidx.databinding.DataBindingUtil
 import androidx.recyclerview.widget.RecyclerView
-import com.harshittest.NewsDetailsAct
 import com.harshittest.R
 import com.harshittest.databinding.ItemNewsItemBinding
-import com.harshittest.room.EntityArticle
+import com.harshittest.model.Article
 import com.squareup.picasso.Picasso
 import java.text.SimpleDateFormat
 import java.util.Locale
@@ -20,11 +18,11 @@ import java.util.Locale
 
 class MainNewsAdapter(
     val mContext: Context,
-    private val onItemClick: (EntityArticle) -> Unit,
-    private var arrayList: MutableList<EntityArticle> = mutableListOf()
+    private val onItemClick: (Article) -> Unit,
+    private var arrayList: MutableList<Article> = mutableListOf()
 ) : RecyclerView.Adapter<MainNewsAdapter.MyViewHolder>(), Filterable {
 
-    private var filteredListData: MutableList<EntityArticle> = arrayList.toMutableList()
+    private var filteredListData: MutableList<Article> = arrayList.toMutableList()
 
     class MyViewHolder(var binding: ItemNewsItemBinding) : RecyclerView.ViewHolder(binding.root)
 
@@ -59,7 +57,7 @@ class MainNewsAdapter(
         }
     }
 
-    fun setData(data: MutableList<EntityArticle>) {
+    fun setData(data: MutableList<Article>) {
         arrayList = data
         filteredListData = arrayList.toMutableList()
         notifyDataSetChanged()
@@ -82,7 +80,7 @@ class MainNewsAdapter(
 
             @Suppress("UNCHECKED_CAST")
             override fun publishResults(constraint: CharSequence?, results: FilterResults?) {
-                filteredListData = results?.values as? MutableList<EntityArticle> ?: mutableListOf()
+                filteredListData = results?.values as? MutableList<Article> ?: mutableListOf()
                 notifyDataSetChanged()
             }
         }

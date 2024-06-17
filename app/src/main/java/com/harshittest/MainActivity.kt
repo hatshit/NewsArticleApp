@@ -13,11 +13,9 @@ import androidx.databinding.DataBindingUtil
 import androidx.lifecycle.Observer
 import androidx.lifecycle.ViewModelProvider
 import androidx.recyclerview.widget.LinearLayoutManager
-import com.google.gson.Gson
-import com.google.gson.reflect.TypeToken
 import com.harshittest.adapter.MainNewsAdapter
 import com.harshittest.databinding.ActivityMainBinding
-import com.harshittest.room.EntityArticle
+import com.harshittest.model.Article
 import com.harshittest.utility.AppUtility
 import com.harshittest.viewmodel.NewsViewModel
 
@@ -37,17 +35,20 @@ class MainActivity : AppCompatActivity() {
         viewModel.setRepository(this@MainActivity)
 
         setupRecyclerView()
-        //for Api call with list refresh
-        setupUI()
-        //used lifeData
-        observeViewModel()
 
         // Trigger initial data load
+        AppUtility.progressBarShow(this@MainActivity)
         viewModel.getNewsList()
+
+        init()
+
+        //used lifeData
+        observeViewModel()
     }
 
-    private fun setupUI() {
+    private fun init() {
         binding.swipeRefresh.setOnRefreshListener {
+            viewModel.setRepository(this@MainActivity)
             viewModel.getNewsList()
         }
         // For search news
@@ -70,7 +71,6 @@ class MainActivity : AppCompatActivity() {
                 setRecord(mutableListOf())  // Handle the case where articles list is empty
                 binding.txtEmpty.visibility = View.VISIBLE
             }
-            AppUtility.progressBarDissMiss()
             binding.swipeRefresh.isRefreshing = false
         })
 
@@ -87,14 +87,14 @@ class MainActivity : AppCompatActivity() {
         binding.rvNewsList.adapter = myMandateAdapter
     }
 
-    private fun setRecord(newsList: MutableList<EntityArticle>) {
+    private fun setRecord(newsList: MutableList<Article>) {
         Log.d("MainAct", "Setting record with ${newsList.size} articles")
         myMandateAdapter.setData(newsList)
     }
 
 
     @SuppressLint("SuspiciousIndentation")
-    private fun onItemClick(article: EntityArticle) {
+    private fun onItemClick(article: Article) {
       val intent = Intent(this@MainActivity, NewsDetailsAct::class.java)
         intent.putExtra("article_data", article)
         startActivity(intent)

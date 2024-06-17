@@ -2,13 +2,11 @@ package com.harshittest.repository
 
 import android.content.Context
 import android.util.Log
-import android.widget.Toast
 import com.google.gson.Gson
 import com.google.gson.JsonObject
-import com.google.gson.reflect.TypeToken
 import com.harshittest.apiclient.ServiceApi
+import com.harshittest.model.Article
 import com.harshittest.room.DaoArticle
-import com.harshittest.room.EntityArticle
 import com.harshittest.utility.AppUtility
 import io.reactivex.android.schedulers.AndroidSchedulers
 import io.reactivex.disposables.CompositeDisposable
@@ -29,34 +27,27 @@ class NewsListRepository(
 
     fun getNewsListFromRepo(
         disposable: CompositeDisposable = CompositeDisposable(),
-        onSuccess: (history: String) -> Unit,
+        onSuccess: (articles: List<Article>) -> Unit,
         onError: (e: Throwable) -> Unit
     ) {
         // First, fetch data from Room database
         CoroutineScope(Dispatchers.IO).launch {
             val cachedArticles = articleDao.getAllArticles()
-            Log.d("NewsListRepository", "Fetched articles from DB: ${cachedArticles.size}")
-            if (cachedArticles.isNotEmpty()) {
-                val cachedJson = Gson().toJson(cachedArticles)
-                withContext(Dispatchers.Main) {
-                    onSuccess(cachedJson)
-                }
-            } else {
-                // If no articles in cache, fetch from network
-                fetchArticlesFromNetwork(disposable, onSuccess, onError)
-            }
+            Log.d("NewsListRepository", "Fetched articles from DB: ${cachedArticles}")
+            onSuccess(cachedArticles)
+            // If no articles in cache, fetch from network
+            fetchArticlesFromNetwork(disposable, onSuccess, onError)
         }
     }
 
     private fun fetchArticlesFromNetwork(
         disposable: CompositeDisposable,
-        onSuccess: (history: String) -> Unit,
+        onSuccess: (articles: List<Article>) -> Unit,
         onError: (e: Throwable) -> Unit
     ) {
+
         if (AppUtility.isInternetConnected(context)) {
             Log.d("NewsListRepository", "Showing progress dialog")
-            AppUtility.progressBarShow(context)
-
             disposable.add(
                 serviceApi.getWithJsonObject(
                     "top-headlines?country=us&category=business&apiKey=2369f4864dc1475b9fc474ef2e24e3fd"
@@ -68,28 +59,38 @@ class NewsListRepository(
                             if (response.body() != null) {
                                 val jsonResponse = response.body().toString()
                                 Log.d("NewsListRepository", "Network response body: $jsonResponse")
+                                val convertedObject: JsonObject = Gson().fromJson(jsonResponse, JsonObject::class.java)
+                                val articlesJsonArray = convertedObject.getAsJsonArray("articles")
+                                val articles = ArrayList<Article>()
+                                for (jsonElement in articlesJsonArray) {
+                                    val jsonObj = jsonElement.asJsonObject
+                                    var author = jsonObj.get("author")?.takeIf { !it.isJsonNull }?.asString
+                                    val title = jsonObj.get("title")?.takeIf { !it.isJsonNull }?.asString
+                                    val description = jsonObj.get("description")?.takeIf { !it.isJsonNull }?.asString
+                                    val url = jsonObj.get("url")?.takeIf { !it.isJsonNull }?.asString
+                                    val urlToImage = jsonObj.get("urlToImage")?.takeIf { !it.isJsonNull }?.asString
+                                    val publishedAt = jsonObj.get("publishedAt")?.takeIf { !it.isJsonNull }?.asString
+                                    val content = jsonObj.get("content")?.takeIf { !it.isJsonNull }?.asString
 
-                                onSuccess(jsonResponse)
+                                    if (author != null && title != null && description != null && url != null &&
+                                        urlToImage != null && publishedAt != null && content != null) {
+                                        val article =    Article(
+                                            author = author,
+                                            title = title,
+                                            description = description,
+                                            url = url,
+                                            urlToImage = urlToImage,
+                                            publishedAt = publishedAt,
+                                            content = content
+                                        )
+                                        articles.add(article)
+                                    }
+                                }
+                                onSuccess(articles)
                                 // Use a CoroutineScope to handle database operations
                                 CoroutineScope(Dispatchers.IO).launch {
                                     try {
-                                        val convertedObject: JsonObject = Gson().fromJson(jsonResponse, JsonObject::class.java)
-                                        val articlesJsonArray = convertedObject.getAsJsonArray("articles")
-                                        val articles: List<EntityArticle> = articlesJsonArray.map { jsonElement ->
-                                            val jsonObj = jsonElement.asJsonObject
-                                            EntityArticle(
-                                                author = jsonObj.get("author")?.takeIf { !it.isJsonNull }?.asString,
-                                                title = jsonObj.get("title")?.takeIf { !it.isJsonNull }?.asString,
-                                                description = jsonObj.get("description")?.takeIf { !it.isJsonNull }?.asString,
-                                                url = jsonObj.get("url")?.takeIf { !it.isJsonNull }?.asString,
-                                                urlToImage = jsonObj.get("urlToImage")?.takeIf { !it.isJsonNull }?.asString,
-                                                publishedAt = jsonObj.get("publishedAt")?.takeIf { !it.isJsonNull }?.asString,
-                                                content = jsonObj.get("content")?.takeIf { !it.isJsonNull }?.asString
-                                            )
-                                        }
-
                                         Log.d("NewsListRepository", "Parsed articles from network: ${articles.size}")
-
                                         // Save articles to Room database
                                         articleDao.deleteAllArticles()
                                         articleDao.insertArticles(articles)
@@ -106,6 +107,8 @@ class NewsListRepository(
                             }
                         }
 
+
+
                         override fun onError(e: Throwable) {
                             Log.e("NewsListRepository", "Network request failed", e)
                             handleError(null, onError)
@@ -113,13 +116,18 @@ class NewsListRepository(
 
                         private fun handleError(response: Response<JsonObject>?, onError: (e: Throwable) -> Unit) {
                             onError(Throwable("Error fetching data from network"))
-                            AppUtility.progressBarDissMiss()
                             if (response?.code() != 401) {
-                                Toast.makeText(
-                                    context,
-                                    "Something went wrong, please try again.",
-                                    Toast.LENGTH_SHORT
-                                ).show()
+                                CoroutineScope(Dispatchers.IO).launch {
+                                    val cachedArticles = articleDao.getAllArticles()
+                                    Log.d("NewsListRepository", "Fetched articles from DB: ${cachedArticles}")
+                                    if (cachedArticles.isNotEmpty()) {
+                                        val cachedJson = Gson().toJson(cachedArticles)
+                                        withContext(Dispatchers.Main) {
+                                            onSuccess(cachedArticles)
+                                        }
+                                    }
+                                }
+                                AppUtility.progressBarDissMiss()
                             }
                         }
                     })
@@ -127,13 +135,18 @@ class NewsListRepository(
         } else {
             Log.d("NewsListRepository", "No internet connection or invalid context type")
             onError(Throwable("No internet connection"))
-            CoroutineScope(Dispatchers.Main).launch {
-                Toast.makeText(
-                    context,
-                    "No network connection, please try again later.",
-                    Toast.LENGTH_SHORT
-                ).show()
+            // First, fetch data from Room database
+            CoroutineScope(Dispatchers.IO).launch {
+                val cachedArticles = articleDao.getAllArticles()
+                Log.d("NewsListRepository", "Fetched articles from DB: ${cachedArticles}")
+                if (cachedArticles.isNotEmpty()) {
+                    val cachedJson = Gson().toJson(cachedArticles)
+                    withContext(Dispatchers.Main) {
+                        onSuccess(cachedArticles)
+                    }
+                }
             }
+            AppUtility.progressBarDissMiss()
         }
     }
 }

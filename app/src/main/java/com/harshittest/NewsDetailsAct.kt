@@ -1,19 +1,18 @@
 package com.harshittest
 
 import android.os.Bundle
-import android.view.View
 import androidx.appcompat.app.AppCompatActivity
 import androidx.databinding.DataBindingUtil
 import com.harshittest.databinding.ActivityNewsDetailsBinding
+import com.harshittest.model.Article
 
-import com.harshittest.room.EntityArticle
 import com.squareup.picasso.Picasso
 import java.text.SimpleDateFormat
 import java.util.Locale
 
 class NewsDetailsAct : AppCompatActivity() {
     lateinit var binding : ActivityNewsDetailsBinding
-    private lateinit var article: EntityArticle
+    private lateinit var article: Article
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         binding= DataBindingUtil.setContentView(this,R.layout.activity_news_details)
